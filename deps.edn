@@ -1,0 +1,7 @@
+{:deps {com.lambdaisland/witchcraft {:local/root "../../lambdaisland/witchcraft"}}
+ :aliases {:dev {:extra-paths ["repl_sessions"]}}
+ :mvn/repos
+ {"glowstone-repo"
+  {:url "https://repo.glowstone.net/content/repositories/snapshots/"}
+  "aikar"
+  {:url "https://repo.aikar.co/nexus/content/repositories/aikar-release/"}}}
