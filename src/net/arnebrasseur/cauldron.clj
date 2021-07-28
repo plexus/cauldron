@@ -63,10 +63,10 @@
                   (swap! block-history conj (:clickedBlock e))))))
 
 (defn last-block []
-  (first @block-history))
+  (wc/block (first @block-history)))
 
 (defn last-blocks [n]
-  (take n @block-history))
+  (map wc/block (take n @block-history)))
 
 (defn clear-surface!
   "Remove all neighbouring blocks, searching all cardinal directions plus upward"

@@ -9,3 +9,7 @@
       (<= 81 n 93) [:stone 6]
       (<= 93 n 95) [:stone 3]
       (<= 96 n 100) [:gravel])))
+
+(defmacro roll [& kvs]
+  `(condp (fn [[low# high#] n#] (<= low# n# high#)) (rand-int 100)
+     ~@kvs))

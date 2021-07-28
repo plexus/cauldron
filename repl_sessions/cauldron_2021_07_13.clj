@@ -2,6 +2,7 @@
   (:require [lambdaisland.witchcraft :as wc]
             [lambdaisland.witchcraft.cursor :as c]
             [net.arnebrasseur.cauldron :refer :all]
+            [net.arnebrasseur.cauldron.layout :refer :all]
             [net.arnebrasseur.cauldron.step-fns :as steps]
             [net.arnebrasseur.cauldron.roll-tables :as rolls]
             [net.arnebrasseur.cauldron.structures :as struct]))
@@ -19,7 +20,7 @@
 (def mesa-overview-loc [2181.9006158178167 120.15193543982032 180.17158041016833 270.29968 21.000025])
 
 (wc/teleport (me) mesa-overview-loc)
-
+(wc/time)
 (clear-surface! [2250 115 161])
 
 (wc/set-blocks
@@ -37,21 +38,7 @@
        :let [[m d] (rolls/stone-paving)]]
    {:x x :y y :z z :material m :data d}))
 
-
-(defn zigzag [width]
-  (fn [c]
-    (let [s (dec width)]
-      (-> c
-          (c/step)
-          (c/rotate -2)
-          (c/steps s)
-          (c/rotate 2)
-          (c/step)
-          (c/rotate 2)
-          (c/steps s)
-          (c/rotate -2)))))
-
-
+;; Build our stairs, add some randomness
 (-> (c/start [2255 114 159] :east)
     (assoc :block-fn steps/clear-above
            :step-fn (fn [c dir]
@@ -66,7 +53,7 @@
            :material :cobblestone-stairs
            :data 1
            :face-direction? false)
-    (c/reps 5 (comp (zigzag 3)
+    (c/reps 5 (comp (steps/zigzag 3)
                     (fn [c]
                       (let [n (rand-int 10)]
                         (cond
@@ -129,6 +116,7 @@
 
 (def stairs (remove (comp #{:air} :material) (map wc/block stairs)))
 
+;; Add some fences around the path
 (wc/set-blocks
  (apply concat
         (for [[x blocks] (group-by :x stairs)]
@@ -181,6 +169,7 @@
  {:x 2264.0, :y 107.0, :z 155.0, :material :fence, :data 0}
  {:x 2264.0, :y 108.0, :z 159.0, :material :fence, :data 0}]
 
+;; set some glowstones on top of the fences fences around the path
 (wc/set-blocks
  (for [fence fences]
    (if (= 1 (count (set (concat (neighbours fence {:dy [0 1]
@@ -189,20 +178,124 @@
                                                    :dy [0 1]})))))
      (assoc (update fence :y inc) :material :glowstone))))
 
-(set (concat (neighbours (last-block) {:dy [0 1]
-                                       :dz [0]})
-             (neighbours (last-block) {:dx [0]
-                                       :dy [0 1]})))
+;; The location of the pillars of the house, topmost block of each pillar (flush
+;; with the future floor)
+(def foundation
+  [{:x 2255 :y 114 :z 174}
+   {:x 2246 :y 114 :z 174}
+   {:x 2246 :y 114 :z 166}
+   {:x 2241 :y 114 :z 166}
+   {:x 2241 :y 114 :z 155}
+   {:x 2253 :y 114 :z 155}
+   {:x 2253 :y 114 :z 161}
+   {:x 2255 :y 114 :z 161}
+   {:x 2255 :y 114 :z 165}])
 
-(neighbours (last-block))
+;; Build fence all around
+(c/build!
+ (reduce
+  (fn [c {:keys [a dir length]}]
+    (-> c
+        (merge a)
+        (c/face :down)
+        (c/material :log 2)
+        (c/block)
+        (c/material :fence)
+        (c/steps (dec length) dir)))
+  (c/start)
+  (points->path (map #(update % :y inc) foundation))))
+
+;; Put in more flooring
+(wc/set-blocks
+ (filter #(#{:air :snow} (:material (wc/block %)))
+         (map #(assoc % :material :step :data 10)
+              (path->plane (points->path foundation)))))
+
+(defn with-material [coll mat]
+  (map #(assoc % :material mat) coll))
+
+(defn update-all [coll kw f & args]
+  (into (empty coll)
+        (map #(apply update % kw f args))
+        coll))
+
+(def foundation-plane (-> foundation points->path path->plane))
+
+(def pillar-locs (-> foundation-plane
+                     shrink-plane
+                     plane->corners
+                     (with-material :log)))
+
+(def wall-outline (-> foundation-plane
+                      shrink-plane
+                      shrink-plane
+                      plane->outline
+                      (with-material :wood)))
+
+(def wall-path (outline->path wall-outline))
+
+(wc/set-blocks
+ (mapcat #(update-all pillar-locs :y + %)
+         (range 1 5)))
+
+;; walls
+(wc/set-blocks
+ (apply concat
+        (for [{:keys [a length dir]} wall-path
+              y (range 1 5)]
+          (let [window-len (long (/ length 3))
+                part1-len (long (/ (- length window-len) 2))
+                part2-len (- length window-len part1-len)]
+            (if (#{2 3} y)
+              (-> (c/start a dir)
+                  (update :y + y)
+                  (c/material :wood)
+                  (c/steps part1-len)
+                  (c/material :thin-glass)
+                  (c/steps window-len)
+                  (c/material :wood)
+                  (c/steps part2-len)
+                  :blocks)
+              (-> (c/start a dir)
+                  (update :y + y)
+                  (c/material :wood)
+                  (c/steps length)
+                  :blocks))))))
+
+
+;; roof
+(loop [y 5
+       path (grow-path (grow-path wall-path))]
+  (as-> (c/start (:a (first path)) (:dir (first path))) $
+    (assoc $ :rotate-block 4)
+    (update $ :y + y)
+    (c/material $ :dark-oak-stairs)
+    (c/block $)
+    (reduce (fn [c {:keys [dir length]}]
+              (-> c
+                  (c/steps length dir)))
+            $
+            path)
+    (c/build! $))
+  (when (< y 9)
+    (recur (inc y) (shrink-path path))))
+
+(wc/add-inventory  (me) :dark-oak-door)
+
+(wc/set-block (assoc (last-block) :material :dark-oak-stairs :data 0))
 
 (wc/undo!)
-(wc/set-time 0)
-(wc/add-inventory (me) [:stone 6] 1)
 
-(.getData (first (wc/inventory (me))))
+(wc/fly!)
 
-(wc/listen! :player-interact ::capture-block
-            (fn [e]
-              (when (:clickedBlock e)
-                #_                (clear-surface! (:clickedBlock e))                )))
+(time (plane->path
+       (wc/block-set
+        (concat
+         (for [x (range 3)
+               y [0]
+               z (range 3)]
+           {:x x :y y :z z})
+         (for [x (range 10 13)
+               y [0]
+               z (range 10 13)]
+           {:x x :y y :z z})))))

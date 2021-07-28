@@ -50,3 +50,19 @@
                (if (= :air (wc/material-name (wc/get-block bv)))
                  blocks
                  (recur bv (conj blocks (assoc bv :material :air :data 0)))))))))
+
+(defn zigzag
+  "Zig-zag left and right, good for building stairs or filling surface.
+  Use with cursor/n-times"
+  [width]
+  (fn [c]
+    (let [s (dec width)]
+      (-> c
+          (c/step)
+          (c/rotate -2)
+          (c/steps s)
+          (c/rotate 2)
+          (c/step)
+          (c/rotate 2)
+          (c/steps s)
+          (c/rotate -2)))))
