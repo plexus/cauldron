@@ -14,9 +14,6 @@
   (:require [lambdaisland.witchcraft :as wc]
             [lambdaisland.witchcraft.cursor :as c]))
 
-(defn block-set [coll]
-  (into c/EMPTY_BLOCK_SET coll))
-
 (defn signed-one
   "Reduce the number to 0/1/-1 based on its sign"
   [n]
@@ -103,7 +100,7 @@
   "Given a set of blocks forming a closed shaped, return the blocks that form the
   inside of the shape."
   [outline]
-  (let [outline (into c/EMPTY_BLOCK_SET outline)
+  (let [outline (wc/block-set outline)
         ;; Pick a random block from the outline
         seed (first outline)
         ;; Find two spots symmetrically on two sides of the seed block that are
@@ -157,7 +154,7 @@
 (defn plane->outline
   "given a contiguous set of locs, get a collection of the outermost ones"
   [locs]
-  (let [locs (into c/EMPTY_BLOCK_SET locs)]
+  (let [locs (wc/block-set locs)]
     (filter (fn [loc]
               (seq (remove locs (neighbour-locs loc))))
             locs)))
@@ -173,21 +170,12 @@
       plane->outline))
 
 (defn grow-plane [plane]
-  (into c/EMPTY_BLOCK_SET
-        (mapcat neighbour-locs)
-        plane))
+  (wc/block-set
+   (mapcat neighbour-locs)
+   plane))
 
 (defn outline->plane [outline]
   (into outline (outline->inner-plane outline)))
-
-(defn outline->path [outline]
-  (-> outline
-      outline->plane
-      plane->corners
-      corners->path))
-
-(defn path->plane [path]
-  (outline->plane (path->outline path)))
 
 (defn plane-corner? [plane loc]
   (when (#{3 7} (count (neighbour-locs plane loc)))
@@ -196,10 +184,19 @@
 (defn plane->corner-set
   "Corners of the plane, but not sorted"
   [plane]
-  (let [plane (block-set plane)]
-    (block-set
+  (let [plane (wc/block-set plane)]
+    (wc/block-set
      (filter #(plane-corner? plane %)
              plane))))
+
+(defn outline->path [outline]
+  (-> outline
+      outline->plane
+      plane->corner-set
+      corners->path))
+
+(defn path->plane [path]
+  (outline->plane (path->outline path)))
 
 ;; get the corners
 ;; pick one
@@ -207,7 +204,7 @@
 ;; repeat until we're done/back at the start
 
 (defn plane->path [plane]
-  (let [plane (block-set plane)
+  (let [plane (wc/block-set plane)
         corners (plane->corner-set plane)]
     (loop [start (first corners)
            loc start
@@ -238,10 +235,10 @@
             (Thread/sleep 500))
         (cond
           (nil? next)
-          (let [end (first (neighbour-locs (block-set (map :a path)) loc))]
+          (let [end (first (neighbour-locs (wc/block-set (map :a path)) loc))]
             (prn loc
                  (neighbour-locs loc)
-                 (block-set (map :a path)))
+                 (wc/block-set (map :a path)))
             (if (empty? remaining)
               (conj path (line-segment start end))
               (let [new-start (first remaining)]

@@ -1,4 +1,5 @@
-{:deps {com.lambdaisland/witchcraft {:local/root "../../lambdaisland/witchcraft"}}
+{:deps {com.lambdaisland/witchcraft {:local/root "/home/arne/github/lambdaisland/witchcraft"}
+        lambdaisland.data-printers {:local/root "/home/arne/github/lambdaisland/data-printers"}}
  :aliases {:dev {:extra-paths ["repl_sessions"]}}
  :mvn/repos
  {"glowstone-repo"
