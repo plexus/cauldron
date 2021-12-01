@@ -6,15 +6,16 @@
   neighbours in a horizontal plane."
   ([loc]
    (neighbours loc nil))
-  ([loc {:keys [dx dy dz]
+  ([loc {:keys [dx dy dz pred]
          :or {dx [-1 0 1]
               dy [0]
-              dz [-1 0 1]}}]
+              dz [-1 0 1]
+              pred #(not= (wc/material-name %) :air)}}]
    (for [dx dx dy dy dz dz
          nloc [(wc/add (wc/location loc) [dx dy dz])]
          :when (not= (wc/location loc) nloc)
          block [(wc/get-block nloc)]
-         :when (not= (wc/material-name block) :air)]
+         :when (pred block)]
      block)))
 
 (defn fill

@@ -1,0 +1,72 @@
+root@witchcraft-base:~# cat /etc/ssh/sshd_config.d/allow_specific_port_forwarding.conf 
+AllowAgentForwarding no
+PermitOpen localhost:32120 localhost:25565
+ForceCommand /opt/bin/ssh_wrapper
+
+root@witchcraft-base:~# cat /opt/bin/ssh_wrapper 
+#!/bin/bash
+
+if [[ `whoami` == "root" ]]; then
+        if [[ -n $SSH_ORIGINAL_COMMAND ]] # command given, so run it
+        then
+                exec /bin/bash -c "$SSH_ORIGINAL_COMMAND"
+        else # no command, so interactive login shell
+                exec bash -il
+        fi
+else
+        echo "No login possible, only access to ports 32120 (nREPL) and 25565 (Witchcraft)"
+fi
+
+
+
+root@witchcraft-base:~# cat /etc/systemd/system/witchcraft.service 
+[Unit]
+Description=Witchcraft
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=witchcraft
+WorkingDirectory=/srv/witchcraft
+ExecStart=clojure -Mnrepl
+
+[Install]
+WantedBy=multi-user.target
+
+
+root@witchcraft-base:~# cat /srv/witchcraft/deps.edn 
+{:deps    {com.lambdaisland/witchcraft   {:git/url "https://github.com/lambdaisland/witchcraft"
+                                          :sha     "04cf484274f22954275cc7885ff622af4eeabd37"}
+           nrepl/nrepl                   {:mvn/version "0.8.3"}
+           refactor-nrepl/refactor-nrepl {:mvn/version "2.5.1"}
+           cider/cider-nrepl             {:mvn/version "0.26.0"}}
+ :aliases
+ {:dev {}
+  :nrepl {:main-opts ["-m" "nrepl.cmdline"
+                      "--middleware" "[refactor-nrepl.middleware/wrap-refactor,cider.nrepl/cider-middleware]"
+                      "-p" "32120"]}}
+
+ :mvn/repos
+ {"glowstone-repo"
+  {:url "https://repo.glowstone.net/content/repositories/snapshots/"}
+  "aikar"
+  {:url "https://repo.aikar.co/nexus/content/repositories/aikar-release/"}}}
+
+
+adduser --system --home /srv/witchcraft witchcraft
+
+➜ ssh plexus@witchcraft.lambdaisland.com -L 32120:localhost:32120 -L 25565:localhost:25565 -N
+
+* Links
+- https://blog.airplane.gg/aikar-flags/
+
+ -Xms8G -Xmx8G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 
+
+clj-minecraft repos:
+
+- https://github.com/ujihisa/massive-chicken-attack
+- https://github.com/izbay/RegEngine
+- https://github.com/bpiel/crafty-repl
