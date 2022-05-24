@@ -1,4 +1,5 @@
 (ns repl-sessions.s2022-05-19
+  "First experiments with the curves API"
   (:require [lambdaisland.witchcraft :as wc]
             [lambdaisland.data-printers]
             [lambdaisland.witchcraft.shapes :as shapes])
