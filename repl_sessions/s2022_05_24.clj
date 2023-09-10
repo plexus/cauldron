@@ -154,6 +154,8 @@
 
 (def arch-anchor [841.0 122.0 687.0])
 
+(wc/teleport arch-anchor)
+
 (wc/set-blocks
  (for [x (range -5 6)
        y (range 6)
@@ -161,6 +163,8 @@
        :when (< 4.5 (m/vlength [x y z]) 5.5)]
    [x y z :stone])
  {:anchor arch-anchor})
+
+(wc/undo!)
 
 (let [radius 9
       resolution 1
@@ -175,7 +179,13 @@
             (* resolution (m/vlength [x y z]))))])
    {:anchor arch-anchor}))
 
-(defn arch-shape [{:keys [width height]}]
+(defn arch-shape
+  "Creates an arch shape in the xy-plane, with given width and height. width can
+  not be smaller than height. if (= width height) then this is just a half
+  circle, if (< width height) then there a certain amount of 'pointedness' at
+  the top. Note that if (< width height) the actual height might be smaller than
+  the requested height."
+  [{:keys [width height]}]
   (assert (<= width height))
   (let [pointedness (- height width)
         radius (+ width pointedness)]
@@ -188,13 +198,63 @@
           :when (= (dec radius) n)]
       [x y z])))
 
-(wc/set-blocks (arch-shape {:width 22 :height 39})
+(wc/set-blocks (arch-shape {:width 12 :height 19})
                {:anchor arch-anchor
                 :material :chiseled-red-sandstone})
 
-(wc/undo!)
+(wc/set-blocks (m/transform
+                (arch-shape {:width 12 :height 19})
+                (m/rotation-matrix (/ Math/PI 2) :x :z))
+               {:anchor arch-anchor
+                :material :chiseled-red-sandstone})
 
-(- 848 834)
-;; => 14
-(- 134 122)
-;; => 12
+(let [steps 60]
+  (wc/set-blocks (for [x (range (- steps) steps)
+                       blk (m/transform
+                            (arch-shape {:width 12 :height 19})
+                            (m/rotation-matrix (* Math/PI (/ 1 steps) x) :x :z))]
+                   blk)
+                 {:anchor arch-anchor
+                  :material :lime-stained-glass}))
+
+(wc/add-inventory me :torch 64)
+
+(wc/set-blocks (m/transform
+                (arch-shape {:width 12 :height 19})
+                (m/rotation-matrix (/ Math/PI 2) :x :z))
+               {:anchor arch-anchor
+                :material :chiseled-red-sandstone})
+
+
+(wc/set-blocks
+ (m/extrude (conj (remove #{[0 17 0]}
+                          (arch-shape {:width 12 :height 19}))
+                  [0 17 0 :shroomlight])
+            [0 -0.34 -1]
+            53)
+ {:anchor arch-anchor
+  :material :chiseled-red-sandstone})
+
+(arch-shape {:width 5 :height 5})
+
+(wc/set-blocks (m/extrude (concat (for [w (range 9 13)
+                                        b (shapes/arch-shape {:width w :height (+ w 5)
+                                                              :material (fn [[x y z]]
+                                                                          (if (= 0 (mod x 5))
+                                                                            :sea-lantern
+                                                                            :slime-block))})]
+                                    b)
+                                  (shapes/line {:start [-11 0 0]
+                                                :end [11 0 0]
+                                                :material :bottom}))
+                          [0 -0.1 -1]
+                          300)
+               {:anchor (wc/add arch-anchor [0 10 0])
+                :palette (fn [m]
+                           (if (= m :bottom)
+                             (palette/rand-palette {:blue-ice 20
+                                                    :honey-block 1})
+                             m))}
+               )
+
+(wc/add-inventory me :birch-boat)
